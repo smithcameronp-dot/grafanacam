@@ -149,9 +149,9 @@ Build a specific plugin: `yarn workspace @grafana-plugins/<name> dev`
 
 ### Prerequisites
 
-- **Node.js v24.x** (see `.nvmrc` for exact version). Use `nvm install` / `nvm use` to match.
-- **Go 1.25.7** (see `go.mod`). Pre-installed in the VM.
-- **Yarn 4.11.0** via corepack (bundled in `.yarn/releases/`). Run `corepack enable` if `yarn` is not found.
+- **Node.js**: `.nvmrc` pins v24.x; engines allow `>= 22 <25`. The VM's default `node` on `PATH` is a v22.x binary at `/exec-daemon/node` that shadows nvm even after `nvm use` (nvm's shims come later on `PATH`). v22 satisfies engines, so `yarn install` and the dev servers work fine with the default node. To use the pinned v24 instead, run `nvm use` then prepend its bin: `export PATH="$NVM_BIN:$PATH"`.
+- **Go** (see `go.mod` for the exact version, currently 1.26.x). The Go toolchain auto-downloads the required version via the `toolchain` directive on first build, so a slightly older pre-installed Go is fine.
+- **Yarn 4.x** (see the `packageManager` field in `package.json`) via corepack (bundled in `.yarn/releases/`). Run `corepack enable` if `yarn` is not found.
 - **GCC** required for CGo/SQLite compilation of the backend.
 
 ### Running services
