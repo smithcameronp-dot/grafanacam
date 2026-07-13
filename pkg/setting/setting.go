@@ -478,6 +478,8 @@ type Cfg struct {
 
 	Quota QuotaSettings
 
+	RateLimiting RateLimitingSettings
+
 	// User settings
 	AllowUserSignUp                bool
 	AllowUserOrgCreate             bool
@@ -1695,6 +1697,10 @@ func (cfg *Cfg) parseINIFile(iniFile *ini.File) error {
 	}
 
 	cfg.readQuotaSettings()
+
+	if err := cfg.readRateLimitingSettings(); err != nil {
+		return err
+	}
 
 	cfg.readExpressionsSettings()
 	if err := cfg.readGrafanaEnvironmentMetrics(); err != nil {
