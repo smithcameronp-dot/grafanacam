@@ -52,7 +52,7 @@ const getStyles = (theme: GrafanaTheme2) => {
       },
     }),
     title: css({
-      color: theme.v1.palette.blue95,
+      color: theme.v1.palette.blue77,
     }),
     cards: css({
       overflowX: 'auto',
