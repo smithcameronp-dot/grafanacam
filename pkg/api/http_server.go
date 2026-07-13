@@ -96,6 +96,7 @@ import (
 	"github.com/grafana/grafana/pkg/services/query"
 	"github.com/grafana/grafana/pkg/services/queryhistory"
 	"github.com/grafana/grafana/pkg/services/quota"
+	"github.com/grafana/grafana/pkg/services/ratelimit"
 	"github.com/grafana/grafana/pkg/services/rendering"
 	"github.com/grafana/grafana/pkg/services/search"
 	"github.com/grafana/grafana/pkg/services/searchusers"
@@ -140,6 +141,7 @@ type HTTPServer struct {
 	AuthTokenService             auth.UserTokenService
 	QuotaService                 quota.Service
 	RemoteCacheService           *remotecache.RemoteCache
+	RateLimitStore               ratelimit.Store
 	ProvisioningService          provisioning.ProvisioningService
 	License                      licensing.Licensing
 	AccessControl                accesscontrol.AccessControl
@@ -254,7 +256,7 @@ func ProvideHTTPServer(opts ServerOptions, cfg *setting.Cfg, routeRegister routi
 	live *live.GrafanaLive, livePushGateway *pushhttp.Gateway, plugCtxProvider *plugincontext.Provider,
 	contextHandler *contexthandler.ContextHandler, loggerMiddleware loggermw.Logger, features featuremgmt.FeatureToggles,
 	alertNG *ngalert.AlertNG, libraryPanelService librarypanels.Service, libraryElementService libraryelements.Service,
-	quotaService quota.Service, socialService social.Service, tracer tracing.Tracer,
+	quotaService quota.Service, rateLimitStore ratelimit.Store, socialService social.Service, tracer tracing.Tracer,
 	encryptionService encryption.Internal, grafanaUpdateChecker *updatemanager.GrafanaService,
 	pluginsUpdateChecker *updatemanager.PluginsService, searchUsersService searchusers.Service,
 	dataSourcesService datasources.DataSourceService, queryDataService query.Service, pluginFileStore plugins.FileStore,
@@ -327,6 +329,7 @@ func ProvideHTTPServer(opts ServerOptions, cfg *setting.Cfg, routeRegister routi
 		AlertNG:                      alertNG,
 		LibraryElementService:        libraryElementService,
 		QuotaService:                 quotaService,
+		RateLimitStore:               rateLimitStore,
 		tracer:                       tracer,
 		log:                          log.New("http.server"),
 		web:                          m,
@@ -723,6 +726,13 @@ func (hs *HTTPServer) addMiddlewaresAndStaticRoutes() {
 
 	m.UseMiddleware(hs.ContextHandler.Middleware)
 	m.Use(middleware.OrgRedirect(hs.Cfg, hs.userService))
+
+	// Rate limiting runs after the context handler so the client IP and signed-in
+	// state are resolved. Health and metrics endpoints registered above already
+	// short-circuit and are therefore exempt.
+	if hs.Cfg.RateLimiting.Enabled {
+		m.Use(middleware.RateLimit(hs.RateLimitStore, hs.Cfg))
+	}
 
 	// needs to be after context handler
 	if hs.Cfg.EnforceDomain {

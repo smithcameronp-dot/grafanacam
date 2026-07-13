@@ -32,6 +32,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"go.opentelemetry.io/otel"
 
@@ -77,11 +78,16 @@ func (hs *HTTPServer) registerRoutes() {
 	quota := middleware.Quota(hs.QuotaService)
 	userUIDResolver := middlewareUserUIDResolver(hs.userService, ":id")
 
+	// Stricter per-IP rate limits for sensitive auth endpoints. These are no-ops
+	// unless rate limiting is enabled, and can be tuned via [rate_limiting.routes].
+	rateLimitLogin := middleware.RateLimitFor(hs.RateLimitStore, hs.Cfg, "login", 5, time.Minute)
+	rateLimitPasswordReset := middleware.RateLimitFor(hs.RateLimitStore, hs.Cfg, "password_reset", 5, time.Minute)
+
 	r := hs.RouteRegister
 
 	// not logged in views
 	r.Get("/logout", hs.Logout)
-	r.Post("/login", requestmeta.SetOwner(requestmeta.TeamAuth), quota(string(auth.QuotaTargetSrv)), routing.Wrap(hs.LoginPost))
+	r.Post("/login", requestmeta.SetOwner(requestmeta.TeamAuth), rateLimitLogin, quota(string(auth.QuotaTargetSrv)), routing.Wrap(hs.LoginPost))
 	r.Get("/login/:name", quota(string(auth.QuotaTargetSrv)), hs.OAuthLogin)
 
 	r.Get("/login", hs.LoginView)
@@ -250,8 +256,8 @@ func (hs *HTTPServer) registerRoutes() {
 	r.Get("/user/password/send-reset-email", reqNotSignedIn, hs.Index)
 	r.Get("/user/password/reset", hs.Index)
 
-	r.Post("/api/user/password/send-reset-email", routing.Wrap(hs.SendResetPasswordEmail))
-	r.Post("/api/user/password/reset", routing.Wrap(hs.ResetPassword))
+	r.Post("/api/user/password/send-reset-email", rateLimitPasswordReset, routing.Wrap(hs.SendResetPasswordEmail))
+	r.Post("/api/user/password/reset", rateLimitPasswordReset, routing.Wrap(hs.ResetPassword))
 
 	// dashboard snapshots
 	r.Get("/dashboard/snapshot/*", reqNoAuth, hs.Index)
