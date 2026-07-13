@@ -46,6 +46,7 @@ import (
 	"github.com/grafana/grafana/pkg/middleware"
 	"github.com/grafana/grafana/pkg/middleware/csrf"
 	"github.com/grafana/grafana/pkg/middleware/loggermw"
+	"github.com/grafana/grafana/pkg/middleware/ratelimit"
 	"github.com/grafana/grafana/pkg/middleware/requestmeta"
 	"github.com/grafana/grafana/pkg/plugins"
 	"github.com/grafana/grafana/pkg/plugins/pluginscdn"
@@ -228,6 +229,7 @@ type HTTPServer struct {
 	dsEndpointRedirects             *prometheus.CounterVec
 	dsConnectionClient              datasource.ConnectionClient
 	publicDashboardsService         publicdashboards.Service
+	rateLimitService                *ratelimit.Service
 }
 
 type TLSCerts struct {
@@ -400,6 +402,7 @@ func ProvideHTTPServer(opts ServerOptions, cfg *setting.Cfg, routeRegister routi
 			Help:      "Total number of datasource endpoint redirects by route (local/remote) and plugin type",
 		}, []string{"route", "plugin_type", "target"}),
 		dsConnectionClient: datasource.NewLegacyConnectionClient(dataSourcesService),
+		rateLimitService:   ratelimit.ProvideService(cfg, promRegister),
 	}
 
 	promRegister.MustRegister(hs.htmlHandlerRequestsDuration)
@@ -690,6 +693,7 @@ func (hs *HTTPServer) addMiddlewaresAndStaticRoutes() {
 
 	m.UseMiddleware(middleware.Recovery(hs.Cfg, hs.License))
 	m.UseMiddleware(hs.Csrf.Middleware())
+	m.UseMiddleware(hs.rateLimitService.Middleware())
 
 	hs.mapStatic(m, hs.Cfg.StaticRootPath, "build", "public/build")
 	hs.mapStatic(m, hs.Cfg.StaticRootPath, "", "public", "/public/views/swagger.html")

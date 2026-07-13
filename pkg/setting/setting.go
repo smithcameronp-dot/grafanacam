@@ -133,6 +133,7 @@ type Cfg struct {
 	EnableGzip        bool
 	EnforceDomain     bool
 	MinTLSVersion     string
+	RateLimiting      RateLimitingSettings
 
 	// Security settings
 	SecretKey             string
@@ -1520,6 +1521,10 @@ func (cfg *Cfg) parseINIFile(iniFile *ini.File) error {
 	cfg.ProvisioningPath = makeAbsolute(provisioning, cfg.HomePath)
 
 	if err := cfg.readServerSettings(iniFile); err != nil {
+		return err
+	}
+
+	if err := cfg.readRateLimitingSettings(); err != nil {
 		return err
 	}
 
